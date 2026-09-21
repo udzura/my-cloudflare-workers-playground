@@ -1,0 +1,10 @@
+/.bundle/
+/.picoruby-build/
+/generated/
+/node_modules/
+/.wrangler/
+/.wrangler-dist/
+/.dev.vars
+/.dev.vars.*
+/.env
+/.env.*

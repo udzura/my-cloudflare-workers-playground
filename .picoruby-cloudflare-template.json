@@ -1,0 +1,14 @@
+{
+  "format_version": 1,
+  "generator_version": "0.1.0.rc4",
+  "features": [
+    "kv",
+    "queue",
+    "durable_object",
+    "access"
+  ],
+  "files": {
+    "app.rb": "c46a9349d594bd7c40f15fb88eeadc2b7469fed27782a290379827b9564ba144",
+    "wrangler.jsonc": "7a0593679b9a295d353a2a16dfbe2b0f5ef6ff5a5c2d3abbfac9a27d02f5f77a"
+  }
+}

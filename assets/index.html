@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG クエリコンソール</title>
+    <style>
+        :root {
+            --bg: #F4F6F4;
+            --panel: #FFFFFF;
+            --border: #D9DEDA;
+            --border-strong: #B7C0BB;
+            --ink: #1B231F;
+            --ink-muted: #5B655F;
+            --accent: #2C4A6E;
+            --accent-soft: #E4EBF2;
+            --gold: #B4791F;
+            --gold-soft: #F3E6D1;
+            --error: #A23B2A;
+            --error-soft: #F6E4DF;
+            --radius: 4px;
+            font-size: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            background-image:
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 28px 28px;
+            background-position: -1px -1px;
+            color: var(--ink);
+            font-family: ui-sans-serif, -apple-system, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", sans-serif;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .mono {
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+        }
+
+        .page {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 48px 20px 80px;
+        }
+
+        header h1 {
+            font-size: 1.65rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            margin: 0 0 8px;
+        }
+
+        header .lede {
+            margin: 0 0 36px;
+            color: var(--ink-muted);
+            max-width: 52ch;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
+            padding: 24px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 18px;
+        }
+
+        .field:last-of-type {
+            margin-bottom: 0;
+        }
+
+        .field label {
+            font-size: 0.85rem;
+            color: var(--ink-muted);
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            font: inherit;
+            font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+            font-size: 0.9rem;
+            color: var(--ink);
+            background: var(--bg);
+            border: 1px solid var(--border-strong);
+            border-radius: var(--radius);
+            padding: 10px 12px;
+            width: 100%;
+        }
+
+        textarea {
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            min-height: 64px;
+        }
+
+        input:focus-visible,
+        textarea:focus-visible,
+        button:focus-visible,
+        .citation:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .field-row {
+            display: flex;
+            align-items: flex-end;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .field-small {
+            flex: 0 0 100px;
+            margin-bottom: 0;
+        }
+
+        button#submit {
+            flex: 1;
+            font: inherit;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #fff;
+            background: var(--accent);
+            border: none;
+            border-radius: var(--radius);
+            padding: 11px 18px;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        button#submit:hover {
+            background: #223c58;
+        }
+
+        button#submit:disabled {
+            background: var(--border-strong);
+            cursor: default;
+        }
+
+        .hint {
+            margin: 12px 0 0;
+            font-size: 0.78rem;
+            color: var(--ink-muted);
+        }
+
+        .status {
+            margin-top: 28px;
+            padding: 14px 16px;
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+        }
+
+        .status.loading {
+            background: var(--accent-soft);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+        }
+
+        .status.error {
+            background: var(--error-soft);
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .status.loading::after {
+                content: "";
+                display: inline-block;
+                width: 6px;
+                height: 6px;
+                margin-left: 8px;
+                border-radius: 50%;
+                background: var(--accent);
+                animation: pulse 1s ease-in-out infinite;
+                vertical-align: middle;
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.25;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        .result {
+            margin-top: 36px;
+        }
+
+        .answer-card {
+            border-left: 3px solid var(--accent);
+            padding: 4px 0 4px 20px;
+            margin-bottom: 40px;
+        }
+
+        .answer-card h2,
+        .sources h2 {
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            color: var(--ink-muted);
+            margin: 0 0 10px;
+        }
+
+        #answerText {
+            font-size: 1.08rem;
+            margin: 0;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .citation {
+            font: inherit;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.82em;
+            color: var(--accent);
+            background: var(--accent-soft);
+            border: none;
+            border-radius: 3px;
+            padding: 1px 5px;
+            cursor: pointer;
+            margin: 0 1px;
+        }
+
+        .citation:hover {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .usage {
+            margin: 14px 0 0;
+            font-size: 0.78rem;
+            color: var(--ink-muted);
+        }
+
+        .sources-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .source-item {
+            display: grid;
+            grid-template-columns: 32px 1fr;
+            gap: 14px;
+            padding: 16px 0;
+            border-top: 1px solid var(--border);
+            transition: background 0.4s ease;
+        }
+
+        .source-item:first-child {
+            border-top: 1px solid var(--border-strong);
+        }
+
+        .source-item.flash {
+            background: var(--gold-soft);
+        }
+
+        .source-num {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.85rem;
+            color: var(--ink-muted);
+            padding-top: 2px;
+        }
+
+        .source-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .source-title {
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .source-id {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.75rem;
+            color: var(--ink-muted);
+        }
+
+        .source-score-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0 10px;
+        }
+
+        .score-bar {
+            flex: 1;
+            max-width: 220px;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: var(--gold);
+            border-radius: 3px;
+        }
+
+        .score-value {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.78rem;
+            color: var(--gold);
+            white-space: nowrap;
+        }
+
+        .source-text {
+            margin: 0;
+            color: var(--ink-muted);
+            font-size: 0.92rem;
+        }
+
+        details.raw {
+            margin-top: 32px;
+        }
+
+        details.raw summary {
+            cursor: pointer;
+            font-size: 0.82rem;
+            color: var(--ink-muted);
+        }
+
+        details.raw pre {
+            margin-top: 10px;
+            padding: 14px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.78rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        @media (max-width: 560px) {
+            .field-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .field-small {
+                flex: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="page">
+        <header>
+            <h1>RAG クエリコンソール</h1>
+            <p class="lede">質問を送信し、生成された回答と、その根拠となったドキュメントの関連度スコアをあわせて確認します。</p>
+        </header>
+
+        <section class="panel">
+            <div class="field">
+                <label for="question">質問</label>
+                <textarea id="question" rows="3" placeholder="例: 水関係のポケモンを2つ教えて"></textarea>
+            </div>
+            <div class="field-row">
+                <div class="field field-small">
+                    <label for="topk">top_k</label>
+                    <input id="topk" type="number" min="1" max="10" value="5">
+                </div>
+                <button id="submit" type="button">質問する</button>
+            </div>
+            <p class="hint">Ctrl / Cmd + Enter でも送信できます</p>
+        </section>
+
+        <section id="status"></section>
+
+        <section id="result" class="result" hidden>
+            <div class="answer-card">
+                <h2>回答</h2>
+                <p id="answerText"></p>
+                <p id="usageText" class="usage"></p>
+            </div>
+
+            <div class="sources">
+                <h2 id="sourcesHeading">根拠ドキュメント</h2>
+                <ol id="sourcesList" class="sources-list"></ol>
+            </div>
+
+            <details class="raw">
+                <summary>ストリームイベントを表示 (JSON)</summary>
+                <pre id="rawJson" class="mono"></pre>
+            </details>
+        </section>
+    </div>
+
+    <script>
+        const SEARCH_ENDPOINT = '/search';
+        const RAG_ENDPOINT = '/rag';
+        const REQUEST_TIMEOUT_MS = 20000; // ここを変えるとタイムアウト時間を調整できます
+
+        const $ = (id) => document.getElementById(id);
+        const questionEl = $('question');
+        const topkEl = $('topk');
+        const submitBtn = $('submit');
+        const statusEl = $('status');
+        const resultEl = $('result');
+        const answerTextEl = $('answerText');
+        const usageTextEl = $('usageText');
+        const sourcesHeadingEl = $('sourcesHeading');
+        const sourcesListEl = $('sourcesList');
+        const rawJsonEl = $('rawJson');
+        const usageNames = ['promptTokens', 'completionTokens', 'totalTokens', 'cachedTokens', 'neurons'];
+        const usageFormatter = new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 4 });
+        let answerBuffer = '';
+        let streamEvents = [];
+        let usageTotals = null;
+        let pendingUsageMessage = null;
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setStatus(type, message) {
+            if (!message) {
+                statusEl.hidden = true;
+                statusEl.className = 'status';
+                statusEl.textContent = '';
+                return;
+            }
+            statusEl.hidden = false;
+            statusEl.className = 'status ' + type;
+            statusEl.textContent = message;
+        }
+
+        function renderAnswer(answer) {
+            const escaped = escapeHtml(answer || '');
+            const withCitations = escaped.replace(/\[(\d+)\]/g, (m, n) =>
+                `<button type="button" class="citation" data-ref="${n}">[${n}]</button>`
+            );
+            answerTextEl.innerHTML = withCitations;
+
+            answerTextEl.querySelectorAll('.citation').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const target = $('source-' + btn.dataset.ref);
+                    if (!target) return;
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    target.classList.add('flash');
+                    setTimeout(() => target.classList.remove('flash'), 1200);
+                });
+            });
+        }
+
+        function extractStreamText(message) {
+            const delta = message?.choices?.[0]?.delta || {};
+            return {
+                reasoning: typeof (delta.reasoning_content ?? delta.reasoning) === 'string'
+                    ? (delta.reasoning_content ?? delta.reasoning) : '',
+                content: typeof (delta.content ?? message?.response) === 'string'
+                    ? (delta.content ?? message?.response) : '',
+            };
+        }
+
+        function numberValue(value) {
+            return typeof value === 'number' && Number.isFinite(value) ? value : null;
+        }
+
+        function extractUsage(message) {
+            const usage = message?.usage;
+            if (!usage || typeof usage !== 'object') return null;
+            const values = {
+                promptTokens: numberValue(usage.prompt_tokens),
+                completionTokens: numberValue(usage.completion_tokens),
+                totalTokens: numberValue(usage.total_tokens),
+                cachedTokens: numberValue(usage.prompt_tokens_details?.cached_tokens),
+                neurons: numberValue(usage.neurons),
+            };
+            return Object.values(values).some((value) => value !== null) ? values : null;
+        }
+
+        function mergeUsage(current, message, replace) {
+            const incoming = extractUsage(message);
+            if (!incoming) return current;
+            const next = current ? { ...current } : Object.fromEntries(
+                usageNames.map((name) => [name, null])
+            );
+            usageNames.forEach((name) => {
+                if (incoming[name] === null) return;
+                next[name] = replace ? incoming[name] : (next[name] ?? 0) + incoming[name];
+            });
+            return next;
+        }
+
+        function isUsageOnlyMessage(message) {
+            if (!extractUsage(message)) return false;
+            const text = extractStreamText(message);
+            return !text.reasoning && !text.content;
+        }
+
+        function renderUsage(usage) {
+            if (!usage) { usageTextEl.textContent = ''; return; }
+            const parts = [];
+            if (usage.promptTokens != null) parts.push(`入力 ${usageFormatter.format(usage.promptTokens)}`);
+            if (usage.completionTokens != null) parts.push(`出力 ${usageFormatter.format(usage.completionTokens)}`);
+            if (usage.totalTokens != null) parts.push(`合計 ${usageFormatter.format(usage.totalTokens)}`);
+            if (usage.cachedTokens != null) parts.push(`キャッシュ済み ${usageFormatter.format(usage.cachedTokens)}`);
+            let text = parts.length ? `トークン使用量: ${parts.join(', ')}` : '';
+            if (usage.neurons != null) text += (text ? ' / ' : '') +
+                `総利用ニューロン ${usageFormatter.format(usage.neurons)}`;
+            usageTextEl.textContent = text;
+        }
+
+        function applyUsage(message, replace = false) {
+            const updated = mergeUsage(usageTotals, message, replace);
+            if (updated === usageTotals) return;
+            usageTotals = updated;
+            renderUsage(usageTotals);
+        }
+
+        function renderSources(sources) {
+            sourcesListEl.innerHTML = '';
+            sourcesHeadingEl.textContent = `根拠ドキュメント（${sources.length}件）`;
+
+            const maxScore = sources.reduce((m, s) => Math.max(m, Number(s.score) || 0), 0) || 1;
+
+            sources.forEach((s, i) => {
+                const n = i + 1;
+                const score = Number(s.score);
+                const pct = isFinite(score) ? Math.max(4, (score / maxScore) * 100) : 0;
+
+                const li = document.createElement('li');
+                li.className = 'source-item';
+                li.id = 'source-' + n;
+
+                li.innerHTML = `
+        <div class="source-num mono">${n}</div>
+        <div>
+          <div class="source-head">
+            <span class="source-title">${escapeHtml(s.title || '(no title)')}</span>
+            <span class="source-id">id: ${escapeHtml(s.id != null ? s.id : '-')}</span>
+          </div>
+          <div class="source-score-row">
+            <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
+            <span class="score-value">score ${isFinite(score) ? score.toFixed(4) : '-'}</span>
+          </div>
+          <p class="source-text">${escapeHtml(s.text || '')}</p>
+        </div>
+      `;
+                sourcesListEl.appendChild(li);
+            });
+        }
+
+        async function readStream(response) {
+            if (!response.body) throw new Error('ストリーム本文がありません');
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let pending = '';
+            let complete = false;
+
+            try {
+                while (!complete) {
+                    const { done, value } = await reader.read();
+                    pending += done ? decoder.decode() : decoder.decode(value, { stream: true });
+                    let boundary;
+                    while ((boundary = /\r?\n\r?\n/.exec(pending))) {
+                        const event = pending.slice(0, boundary.index);
+                        pending = pending.slice(boundary.index + boundary[0].length);
+                        const data = event.split(/\r?\n/)
+                            .filter((line) => line.startsWith('data:'))
+                            .map((line) => line.slice(5).replace(/^ /, ''))
+                            .join('\n');
+                        if (!data) continue;
+                        if (data === '[DONE]') {
+                            if (pendingUsageMessage) applyUsage(pendingUsageMessage, true);
+                            pendingUsageMessage = null;
+                            complete = true;
+                            break;
+                        }
+
+                        const message = JSON.parse(data);
+                        streamEvents.push(message);
+                        if (message.error) throw new Error('AIがエラーを返しました');
+                        if (pendingUsageMessage) applyUsage(pendingUsageMessage);
+                        pendingUsageMessage = isUsageOnlyMessage(message) ? message : null;
+                        if (!pendingUsageMessage) applyUsage(message);
+
+                        const text = extractStreamText(message);
+                        if (text.reasoning) setStatus('loading', '推論中…');
+                        if (text.content) {
+                            answerBuffer += text.content;
+                            renderAnswer(answerBuffer);
+                            setStatus('loading', '回答を生成中…');
+                        }
+                    }
+                    if (done) {
+                        if (!complete) throw new Error('完了通知の前に接続が終了しました');
+                        break;
+                    }
+                }
+            } finally {
+                await reader.cancel().catch(() => {});
+                reader.releaseLock();
+            }
+        }
+
+        async function runQuery() {
+            const question = questionEl.value.trim();
+            const topK = parseInt(topkEl.value, 10) || 5;
+
+            if (!question) { setStatus('error', '質問を入力してください。'); return; }
+
+            resultEl.hidden = true;
+            submitBtn.disabled = true;
+            answerBuffer = '';
+            streamEvents = [];
+            usageTotals = null;
+            pendingUsageMessage = null;
+            renderAnswer('');
+            renderUsage(null);
+            rawJsonEl.textContent = '';
+            setStatus('loading', '根拠ドキュメントを検索中…');
+
+            try {
+                const requestBody = JSON.stringify({ question, top_k: topK });
+                const searchResponse = await fetch(SEARCH_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ query: question, top_k: topK }),
+                    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+                });
+                if (!searchResponse.ok) {
+                    throw new Error(`検索HTTPエラー: ${searchResponse.status} ${searchResponse.statusText}`);
+                }
+                const searchResult = await searchResponse.json();
+                const sources = Array.isArray(searchResult.sources) ? searchResult.sources : [];
+                renderSources(sources);
+                resultEl.hidden = false;
+                setStatus('loading', '回答を生成中…');
+
+                const response = await fetch(RAG_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: requestBody,
+                    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+                });
+                if (!response.ok) {
+                    throw new Error(`生成HTTPエラー: ${response.status} ${response.statusText}`);
+                }
+                if (!response.headers.get('content-type')?.includes('text/event-stream')) {
+                    throw new Error('SSE以外の応答を受信しました');
+                }
+
+                await readStream(response);
+                rawJsonEl.textContent = JSON.stringify({ question, sources, events: streamEvents }, null, 2);
+                setStatus(null, null);
+            } catch (err) {
+                if (err.name === 'TimeoutError') {
+                    setStatus('error', `処理がタイムアウトしました（${REQUEST_TIMEOUT_MS / 1000}秒経過）。しばらくしてから再度お試しください。`);
+                } else {
+                    setStatus('error', `リクエストに失敗しました: ${err.message}`);
+                }
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        submitBtn.addEventListener('click', runQuery);
+        questionEl.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') runQuery();
+        });
+    </script>
+
+</body>
+
+</html>
