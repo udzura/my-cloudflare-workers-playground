@@ -1,5 +1,5 @@
 class App < Sinatra::Base
-  EMBEDDING_MODEL = "@cf/bge-m3"
+  EMBEDDING_MODEL = "@cf/qwen/qwen3-embedding-0.6b"
   GENERATION_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
   VECTOR_INDEX = "VECTOR_INDEX"
   MAX_DOCUMENT_BYTES = 7_000
@@ -109,6 +109,11 @@ class App < Sinatra::Base
     })
   end
 
+  get "/healthz" do
+    p "debug env: #{env["rack.input"].inspect}"
+    json_response({ "status" => "ok" })
+  end
+
   post "/documents" do
     begin
       payload = request_json
@@ -139,7 +144,11 @@ class App < Sinatra::Base
       sources = search_documents(query, top_k(payload)).map { |match| source_from_match(match) }
       json_response({ "query" => query, "sources" => sources })
     rescue ArgumentError => error
+      p "ArgumentError: #{error.message}"
       json_response({ "error" => error.message }, 400)
+    rescue => error
+      p "Error: #{error.message}"
+      json_response({ "error" => error.message }, 500)
     end
   end
 
