@@ -111,7 +111,7 @@ class App < Sinatra::Base
 
   get "/healthz" do
     p "debug env: #{env["rack.input"].inspect}"
-    json_response({ "status" => "ok" })
+    json_response({ "status" => "ok", "now" => Time.now.to_s, "now_jst" => Time.now.getlocal("+09:00").to_s })
   end
 
   post "/documents" do
