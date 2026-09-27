@@ -6,7 +6,6 @@ MRuby::CrossBuild.new("worker") do |conf|
     # Optional overrides, applied before build setup:
     # cf.picoruby_cloudflare_worker_wasm_mgem_dir = "/Users/udzura/ghq/github.com/udzura/picoruby-cloudflare-worker-wasm"
     # cf.mruby_rack_mgem_dir = "vendor/mruby-rack"
-    cf.picoruby_cloudflare_worker_wasm_revision = "0.9.1"
     # cf.picoruby_cloudflare_worker_wasm_revision = "ebab3afc4b06cdb29508de453795de90349c4691"
     # cf.mruby_rack_mgem_revision = "<commit SHA>"
   end
