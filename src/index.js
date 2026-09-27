@@ -5,42 +5,47 @@ import { cloudflareBindingTypes } from "../generated/worker/bindings.js";
 export { PicoRubyDurableObject } from "../generated/worker/runtime/index.js";
 
 async function timingSafeEqual(a, b) {
-    const enc = new TextEncoder();
-    const aBytes = enc.encode(a);
-    const bBytes = enc.encode(b);
-    if (aBytes.byteLength !== bBytes.byteLength) return false;
-    return crypto.subtle.timingSafeEqual(aBytes, bBytes);
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  if (aBytes.byteLength !== bBytes.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(aBytes, bBytes);
 }
 
-export default {
-    async fetch(request, env) {
-        const authorization = request.headers.get('Authorization');
+async function rackEnv(request, env, _ctx) {
+  const authorization = request.headers.get("Authorization");
+  if (!authorization?.startsWith("Basic ")) return {};
 
-        if (!authorization || !authorization.startsWith('Basic ')) {
-            return new Response('Authentication required.', {
-                status: 401,
-                headers: { 'WWW-Authenticate': 'Basic realm="Restricted"' },
-            });
-        }
+  let credentials;
+  try {
+    credentials = atob(authorization.slice(6));
+  } catch {
+    return {};
+  }
+  const separator = credentials.indexOf(":");
+  if (separator < 0) return {};
 
-        const [user, pass] = atob(authorization.slice(6)).split(':');
-        const ok =
-            (await timingSafeEqual(user, (env.BASIC_AUTH_USER || "dummy"))) &&
-            (await timingSafeEqual(pass, (env.BASIC_AUTH_PASS || "dummy")));
+  const user = credentials.slice(0, separator);
+  const pass = credentials.slice(separator + 1);
+  const passed =
+    (await timingSafeEqual(user, env.BASIC_AUTH_USER || "dummy")) &&
+    (await timingSafeEqual(pass, env.BASIC_AUTH_PASS || "dummy"));
+  return passed ? { "custom.basic_auth_passed": true } : {};
+}
 
-        if (!ok) {
-            return new Response('Authentication required.', {
-                status: 401,
-                headers: { 'WWW-Authenticate': 'Basic realm="Restricted"' },
-            });
-        }
+async function afterRequest(request, env, _ctx, rackEnv, response) {
+  if (rackEnv["custom.basic_auth_passed"] !== true) return response;
 
-        const url = new URL(request.url);
-        if (url.pathname !== '/' && url.pathname !== ('/index.html')) {
-            const workerFetch = createWorker({ app, bindingTypes: cloudflareBindingTypes });
-            return workerFetch.fetch(request, env);
-        }
+  const pathname = new URL(request.url).pathname;
+  if (pathname === "/" || pathname === "/index.html") {
+    return env.ASSETS.fetch(request);
+  }
+  return response;
+}
 
-        return env.ASSETS.fetch(request);
-    },
-};
+export default createWorker({
+  app,
+  bindingTypes: cloudflareBindingTypes,
+  rackEnv,
+  afterRequest,
+});

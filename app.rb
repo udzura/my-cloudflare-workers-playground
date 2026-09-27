@@ -6,6 +6,10 @@ class App < Sinatra::Base
   MAX_QUERY_BYTES = 2_000
   MAX_TOP_K = 10
 
+  before do
+    halt 401, { "WWW-Authenticate" => 'Basic realm="Restricted"' }, "Authentication required." unless env["custom.basic_auth_passed"]
+  end
+
   helpers do
     def cloudflare_hijack(descriptor)
       content_type "text/event-stream"
