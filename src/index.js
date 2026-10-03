@@ -37,6 +37,11 @@ async function afterRequest(request, env, _ctx, rackEnv, response) {
   if (rackEnv["custom.basic_auth_passed"] !== true) return response;
 
   const pathname = new URL(request.url).pathname;
+  if (pathname === "/clef.html") {
+    const assetUrl = new URL(request.url);
+    assetUrl.pathname = "/clef";
+    return env.ASSETS.fetch(new Request(assetUrl, request));
+  }
   if (pathname === "/" || pathname === "/index.html") {
     return env.ASSETS.fetch(request);
   }

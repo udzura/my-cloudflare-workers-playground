@@ -4,6 +4,7 @@ class App < Sinatra::Base
   VECTOR_INDEX = "VECTOR_INDEX"
   MAX_DOCUMENT_BYTES = 7_000
   MAX_QUERY_BYTES = 2_000
+  MAX_CLEF_STATE_BYTES = 12_000
   MAX_TOP_K = 10
 
   before do
@@ -109,6 +110,7 @@ class App < Sinatra::Base
         "register" => "POST /documents",
         "search" => "POST /search",
         "rag" => "POST /rag",
+        "clef" => "POST /api/clef",
       },
     })
   end
@@ -178,6 +180,46 @@ class App < Sinatra::Base
       cloudflare_hijack(descriptor)
     rescue ArgumentError => error
       json_response({ "error" => error.message }, 400)
+    end
+  end
+
+  post "/api/clef" do
+    begin
+      payload = request_json
+      state = required_string(payload, "state", MAX_CLEF_STATE_BYTES)
+      raise ArgumentError, "state must not be blank" if state.strip.empty?
+
+      result = cloudflare.AI.run("@cf/cloudflare/clef", {
+        "model" => "clef",
+        "state" => state,
+        "questions" => {
+          "urgent" => {
+            "type" => "noul",
+            "instructions" => "Is this support request urgent?",
+          },
+          "team" => {
+            "type" => "choice",
+            "instructions" => "Which team should handle this request?",
+            "criteria" => {
+              "billing" => "Payments, invoices, and refunds",
+              "technical" => "Outages, errors, and configuration",
+              "sales" => "Plans and upgrades",
+            },
+          },
+          "severity" => {
+            "type" => "score",
+            "instructions" => "How severe is the customer impact?",
+            "criteria" => ["No impact", "Minor", "Major", "Critical"],
+          },
+        },
+      })
+
+      json_response(result)
+    rescue ArgumentError => error
+      json_response({ "error" => error.message }, 400)
+    rescue => error
+      p "Clef inference error: #{error.message}"
+      json_response({ "error" => "Clef inference failed" }, 502)
     end
   end
 end

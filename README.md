@@ -110,3 +110,22 @@ so Wrangler and the binding registry select the same environment. Do not select 
 environment using only `--env`; custom build processes need `CLOUDFLARE_ENV` too.
 
 Commit `Gemfile.lock` and `package-lock.json`. Deploy explicitly with `npm run deploy`.
+
+## Clef decision demo
+
+Open `/clef.html` to try a support-triage form backed by `POST /api/clef` in
+Sinatra. The browser sends a support request as `state`; the endpoint calls
+`@cf/cloudflare/clef` with `noul`, `choice`, and `score` questions and returns
+the model response, including its per-option probabilities. The example limits
+`state` to 12,000 bytes. Inference errors are logged by the Worker and returned
+as a generic 502 JSON response.
+
+```sh
+curl -X POST http://localhost:8787/api/clef \
+  -H 'content-type: application/json' \
+  -d '{"state":"Checkout has been failing for every customer for the last hour."}'
+```
+
+The page is served from Cloudflare Static Assets and uses the same Basic Auth
+as the rest of this playground. See [Cloudflare's Clef model documentation](https://developers.cloudflare.com/workers-ai/models/clef/)
+for input types, model limits, and pricing.

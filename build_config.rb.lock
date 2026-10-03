@@ -1,0 +1,37 @@
+---
+mruby:
+  version: 4.0.0
+  release_no: 40000
+  git_commit: 65b7ae6256faa2e53aa0cf8249c8ad5f1cd86327
+builds:
+  worker:
+    https://github.com/udzura/mruby-rack.git:
+      url: https://github.com/udzura/mruby-rack.git
+      branch: master
+      commit: afd805f1991b46639ce1fbb778820fe586155bc2
+      version: 0.1.0
+    https://github.com/udzura/picoruby-cloudflare-worker-wasm.git:
+      url: https://github.com/udzura/picoruby-cloudflare-worker-wasm.git
+      branch: master
+      commit: 27a25497d5c4f11fc08cea767d9ead015f772e28
+      version: 0.0.0
+    https://github.com/udzura/picoruby-sinatra-covers.git:
+      url: https://github.com/udzura/picoruby-sinatra-covers.git
+      branch: master
+      commit: 84a2c7f31e80894df4bdf8b6672da2a720ce9fc5
+      version: 0.1.0
+    https://github.com/udzura/picoruby-rack-sessions-cloudflare.git:
+      url: https://github.com/udzura/picoruby-rack-sessions-cloudflare.git
+      branch: main
+      commit: 98a0d34bc6254a839de9abb6d21dee1bd6ff654b
+      version: 0.1.0
+    https://github.com/udzura/mruby-jsonrs.git:
+      url: https://github.com/udzura/mruby-jsonrs.git
+      branch: master
+      commit: a722d67c006f9609b688bf78ebe253734a24f471
+      version: 0.1.0
+    https://github.com/udzura/mruby-mustermann.git:
+      url: https://github.com/udzura/mruby-mustermann.git
+      branch: master
+      commit: acc29b7a28721474ef07d40a6263a4806855fcd5
+      version: 0.1.0

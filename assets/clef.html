@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Clef decision demo</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font: 16px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #18251f;
+      background: #f1f4f1;
+      --line: #d4ddd7;
+      --muted: #5d6c63;
+      --green: #176b4d;
+      --green-soft: #e4f1e9;
+      --red: #a43d32;
+      --red-soft: #f8e9e5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background-image: linear-gradient(#e5eae6 1px, transparent 1px), linear-gradient(90deg, #e5eae6 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+    main { width: min(780px, 100%); margin: auto; padding: 48px 20px 80px; }
+    a { color: var(--green); }
+    .eyebrow { color: var(--green); font: 700 .76rem/1.4 ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; }
+    h1 { margin: 8px 0; font-size: clamp(1.8rem, 5vw, 2.5rem); line-height: 1.15; }
+    .lede { max-width: 60ch; margin: 0 0 28px; color: var(--muted); }
+    .panel { padding: 24px; border: 1px solid #b9c7be; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px #183b2b0a; }
+    label { display: block; margin-bottom: 7px; color: var(--muted); font-size: .85rem; font-weight: 700; }
+    textarea { display: block; width: 100%; min-height: 150px; resize: vertical; padding: 12px; border: 1px solid #aebdb3; border-radius: 5px; background: #f8faf8; color: inherit; font: inherit; }
+    textarea:focus-visible, button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+    .controls { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
+    button { border: 0; border-radius: 5px; padding: 11px 18px; background: var(--green); color: white; font: inherit; font-weight: 700; cursor: pointer; }
+    button:hover { background: #10583e; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .hint { color: var(--muted); font-size: .8rem; }
+    #status { margin-top: 20px; padding: 12px 14px; border-radius: 5px; }
+    #status[hidden] { display: none; }
+    #status.loading { border: 1px solid #8eb7a1; background: var(--green-soft); color: #155d43; }
+    #status.error { border: 1px solid #d9a39b; background: var(--red-soft); color: var(--red); }
+    #results { margin-top: 24px; }
+    #results[hidden] { display: none; }
+    .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    h2 { margin: 0; font-size: 1rem; }
+    .model { color: var(--muted); font: .78rem ui-monospace, monospace; }
+    .answer { margin: 10px 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+    .answer h3 { margin: 0 0 6px; font-size: .9rem; }
+    .answer pre, #raw { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; font: .86rem/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    details { margin-top: 18px; }
+    summary { color: var(--muted); cursor: pointer; font-size: .85rem; }
+    #raw { margin-top: 10px; padding: 14px; border: 1px solid var(--line); border-radius: 5px; background: #fff; }
+    @media (max-width: 520px) { main { padding-top: 32px; } .panel { padding: 18px; } .controls { align-items: flex-start; flex-direction: column; gap: 8px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Workers AI · @cf/cloudflare/clef</p>
+    <h1>Support triage</h1>
+    <p class="lede">Describe a customer support situation. Clef evaluates the state against three typed questions and returns a probability for each allowed decision.</p>
+    <section class="panel" aria-labelledby="state-label">
+      <label id="state-label" for="state">Support request state</label>
+      <textarea id="state" maxlength="12000">Checkout has been failing for every customer for the last hour.</textarea>
+      <div class="controls">
+        <button id="submit" type="button">Evaluate request</button>
+        <span class="hint">The request is sent to the Sinatra API at <code>POST /api/clef</code>.</span>
+      </div>
+    </section>
+    <div id="status" role="status" aria-live="polite" hidden></div>
+    <section id="results" aria-live="polite" hidden>
+      <div class="results-head"><h2>Decision results</h2><span class="model">Clef · 27B</span></div>
+      <div id="answers"></div>
+      <details><summary>View complete API response</summary><pre id="raw"></pre></details>
+    </section>
+    <p class="hint"><a href="/">Back to the RAG demo</a></p>
+  </main>
+  <script>
+    const stateEl = document.getElementById('state');
+    const submitEl = document.getElementById('submit');
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const answersEl = document.getElementById('answers');
+    const rawEl = document.getElementById('raw');
+
+    function showStatus(type, message) {
+      statusEl.className = type;
+      statusEl.textContent = message;
+      statusEl.hidden = !message;
+    }
+
+    function renderAnswers(response) {
+      const answers = response && response.answers;
+      answersEl.replaceChildren();
+      if (answers && typeof answers === 'object') {
+        Object.entries(answers).forEach(([name, answer]) => {
+          const card = document.createElement('article');
+          card.className = 'answer';
+          const heading = document.createElement('h3');
+          heading.textContent = name;
+          const value = document.createElement('pre');
+          value.textContent = JSON.stringify(answer, null, 2);
+          card.append(heading, value);
+          answersEl.append(card);
+        });
+      } else {
+        const card = document.createElement('article');
+        card.className = 'answer';
+        card.textContent = 'This response did not include an answers object. See the complete response below.';
+        answersEl.append(card);
+      }
+      rawEl.textContent = JSON.stringify(response, null, 2);
+      resultsEl.hidden = false;
+    }
+
+    async function evaluate() {
+      const state = stateEl.value.trim();
+      if (!state) { showStatus('error', 'Enter a support request state first.'); return; }
+      submitEl.disabled = true;
+      resultsEl.hidden = true;
+      showStatus('loading', 'Evaluating with Clef…');
+      try {
+        const response = await fetch('/api/clef', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ state }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `Request failed (${response.status})`);
+        renderAnswers(payload);
+        showStatus('', 'Evaluation complete.');
+      } catch (error) {
+        showStatus('error', error.message || 'Could not evaluate this request.');
+      } finally {
+        submitEl.disabled = false;
+      }
+    }
+
+    submitEl.addEventListener('click', evaluate);
+  </script>
+</body>
+</html>
