@@ -8,3 +8,4 @@
 /.dev.vars.*
 /.env
 /.env.*
+/.cloudflare/
